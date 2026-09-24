@@ -23,6 +23,12 @@ function run(ctx) {
   var configXmlHelper = new ConfigXmlHelper(ctx);
   var newProjectName = configXmlHelper.getProjectName();
 
+  // cordova-ios 8 uses App/Entitlements-{Debug,Release}.plist and does not
+  // need the legacy project-name-based entitlement rename.
+  if (isCordovaIos8OrNewer(iosProjectFilePath)) {
+    return;
+  }
+
   var oldProjectName = getOldProjectName(iosProjectFilePath);
 
   // if name has not changed - do nothing
@@ -42,6 +48,11 @@ function run(ctx) {
     console.warn('Failed to rename .entitlements file.');
     console.warn(err);
   }
+}
+
+function isCordovaIos8OrNewer(iosProjectFilePath) {
+  return fs.existsSync(path.join(iosProjectFilePath, 'App', 'Entitlements-Debug.plist'))
+      || fs.existsSync(path.join(iosProjectFilePath, 'App', 'Entitlements-Release.plist'));
 }
 
 // region Private API

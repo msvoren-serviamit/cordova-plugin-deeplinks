@@ -7,6 +7,7 @@ Which is:
 */
 
 var path = require('path');
+var fs = require('fs');
 var compare = require('node-version-compare');
 var ConfigXmlHelper = require('../configXmlHelper.js');
 var IOS_DEPLOYMENT_TARGET = '8.0';
@@ -27,6 +28,13 @@ module.exports = {
 function enableAssociativeDomainsCapability(cordovaContext) {
   context = cordovaContext;
 
+  // cordova-ios 8+ already wires CODE_SIGN_ENTITLEMENTS to the correct
+  // App/Entitlements-{Debug,Release}.plist files. Do not mutate the
+  // generated Xcode project or create a legacy entitlements reference.
+  if (isCordovaIos8OrNewer()) {
+    return;
+  }
+
   var projectFile = loadProjectFile();
 
   // adjust preferences
@@ -37,6 +45,17 @@ function enableAssociativeDomainsCapability(cordovaContext) {
 
   // save changes
   projectFile.write();
+}
+
+/**
+ * Detect the cordova-ios 8+ project layout.
+ *
+ * @return {Boolean}
+ */
+function isCordovaIos8OrNewer() {
+  var appDir = path.join(iosPlatformPath(), 'App');
+  return fs.existsSync(path.join(appDir, 'Entitlements-Debug.plist'))
+      || fs.existsSync(path.join(appDir, 'Entitlements-Release.plist'));
 }
 
 // endregion
@@ -146,11 +165,9 @@ function loadProjectFile() {
           platform_ios = context.requireCordovaModule('cordova-lib/src/plugman/platforms/ios');
           projectFile = platform_ios.parseProjectFile(iosPlatformPath());
       } catch (e) {
-          // Then cordova 7.0
-          console.log('Cordova 7.0 detected - apply globSync()');
-          var project_files = require('glob').globSync(path.join(iosPlatformPath(), '*.xcodeproj', 'project.pbxproj'));
-          console.log('project_files:');
-          console.log(project_files);
+          // Then cordova 7.0. Use the Node filesystem API instead of relying
+          // on glob being installed as a transitive dependency.
+          var project_files = findProjectFiles();
           
           if (project_files.length === 0) {
               throw new Error('does not appear to be an xcode project (no xcode project file)');
@@ -174,8 +191,11 @@ function loadProjectFile() {
               
               fs.writeFileSync(pbxPath, xcodeproj.writeSync());
                   if (Object.keys(frameworks).length === 0){
-                      // If there is no framework references remain in the project, just remove this file
-                      require('shelljs').rm('-rf', frameworks_file);
+                      // If there are no framework references left in the
+                      // project, remove the bookkeeping file if it exists.
+                      if (fs.existsSync(frameworks_file)) {
+                          fs.rmSync(frameworks_file, { force: true, recursive: true });
+                      }
                       return;
                   }
                   fs.writeFileSync(frameworks_file, JSON.stringify(this.frameworks, null, 4));
@@ -186,6 +206,30 @@ function loadProjectFile() {
   
   return projectFile;
   } 
+
+function findProjectFiles() {
+  var projectFiles = [];
+  var entries;
+
+  try {
+    entries = fs.readdirSync(iosPlatformPath());
+  } catch (e) {
+    return projectFiles;
+  }
+
+  entries.forEach(function(entry) {
+    if (path.extname(entry) !== '.xcodeproj') {
+      return;
+    }
+
+    var projectFile = path.join(iosPlatformPath(), entry, 'project.pbxproj');
+    if (fs.existsSync(projectFile)) {
+      projectFiles.push(projectFile);
+    }
+  });
+
+  return projectFiles;
+}
 
 /**
  * Remove comments from the file.
