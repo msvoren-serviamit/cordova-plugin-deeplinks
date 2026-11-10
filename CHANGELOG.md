@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 1.2.2 (2026-11-10)
+
+
+### Bug Fixes
+
+* support Cordova iOS 8 universal links ([1903a82](https://github.com/msvoren-serviamit/cordova-plugin-deeplinks/commit/1903a826eba5251ccc5e1b41bdc2ee1ee145522a))
+* support cordova-ios 8 entitlements ([e627d0a](https://github.com/msvoren-serviamit/cordova-plugin-deeplinks/commit/e627d0ae71da964c51c205b42c04acdec3ff4010))
+
 ## [1.2.1] - 2026-11-10
 
 ### Fixed
