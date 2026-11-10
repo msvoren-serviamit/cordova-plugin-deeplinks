@@ -18,6 +18,8 @@
     NSMutableDictionary<NSString *, NSString *> *_subscribers;
 }
 
+- (void)handleContinueUserActivityNotification:(NSNotification *)notification;
+
 @end
 
 @implementation CULPlugin
@@ -26,9 +28,24 @@
 
 - (void)pluginInitialize {
     [self localInit];
+    // cordova-ios 8 routes Universal Links through CDVSceneDelegate instead of
+    // AppDelegate. Keep the legacy AppDelegate callback for older platforms.
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleContinueUserActivityNotification:)
+                                                 name:@"CDVPluginContinueUserActivityNotification"
+                                               object:nil];
     // Can be used for testing.
     // Just uncomment, close the app and reopen it. That will simulate application launch from the link.
 //    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onResume:) name:UIApplicationWillEnterForegroundNotification object:nil];
+}
+
+- (void)handleContinueUserActivityNotification:(NSNotification *)notification {
+    id activity = notification.object;
+    if (![activity isKindOfClass:[NSUserActivity class]]) {
+        return;
+    }
+
+    [self handleUserActivity:(NSUserActivity *)activity];
 }
 
 //- (void)onResume:(NSNotification *)notification {
@@ -65,6 +82,9 @@
 }
 
 - (void)onAppTerminate {
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:@"CDVPluginContinueUserActivityNotification"
+                                                  object:nil];
     _supportedHosts = nil;
     _subscribers = nil;
     _storedEvent = nil;
